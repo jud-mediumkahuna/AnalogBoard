@@ -1,4 +1,18 @@
-Please pardon the hand drawn skematic. I'm still trying to get the lastest version of Eagle to run.
-The skematic has three parts: three (of N) channels of input, four input conditioning options for one voltage and three current measuring options and some common circuitry for making buffered refeerence voltages.
-The input channels are all the same and consist of an opamp based integrator (U1 and C1), a comparitor (U2), a "D" style flip flop (U4) and a tristate buffer (U3).
-Each channel feeds a succesive approximation 
+The schematic has three parts: three (of N) channels of input (upper right), four input conditioning options for one voltage and three current measuring options (left side) and some common circuitry for making buffered reference voltages (bottom right). Also there's a Teensy along the far right. The whole thing runs on 3.3 Volts (Vanal).
+
+The input channels are all the same and consist of an op-amp based integrator (U1 and C1), a comparator (U2), a "D" style flip flop (U4) and a tri-state buffer (U3).
+Each channel is basically a one stage delta sigma converter which feeds the residual/remainder of the integral to a successive approximation A/D in the Teensy (far right).
+The timing diagram (top right) shows the signal that operates the flip flop clock and the output enable on the tri-state buffer.
+The delta sigma stage operates at 800K Hz. The A/Ds on the Teensy will operate at 100K Hz each channel. There are two actual A/Ds in the Teensy so you can read two channels at once. By staggering the Teensy A/D reads you can get 16 channels each read 100K times per second.
+
+The conditioned analog input goes in the left side of R4, R5 or R6 which are used to scale the input such that the maximum integral (output of U1) over 1.250 micro seconds is less than 1/4 of full scale (0.825 Volts). U2 compares the integral to half of full scale of the Teensy A/Ds (1.65 Volts). The result of the compare is clocked into the flip flop 50 nano seconds before the tri-state buffer is turned on for 1200 nano seconds. The resistor R1 is such that 0.825 Volts is added or subtracted from the integral during each 1200 ns pulse. The values of C1 and R1 are about 206pF and 12K Ohm.
+
+The Teensy A/Ds read each channel once every 8 pulses and the pulses add or subtract 1/4 of the D/A full scale so, you only pick up one extra bit of resolution with this delta sigma front end. The Teensy A/Ds are 12bit (honest 9 bits with offsets and what not.) so, I get an honest 10 bits at 100K Hz (which is my requirement for brain style motor control which I'm not certain is right but should be close). The important thing is that I don't drop any data and my integrals, all, add up.
+
+I'm assuming random noise which adds up to zero in the integral (if it doesn't add up to zero, it's not random and, you need to (and can) model it). The question is: how many samples does it take until the integral of the noise adds up to zero? For discrete samples and numerical integration it could be quite a few (like 20). The analog integral is almost noise free (less than a 1/2 bit) at each sample (and that's only one of the good reasons for using the analog integral).
+
+The reason I use a tri-state buffer is to make sure I always get the same loss due to transitions regardless of the sequence of bits.
+
+The circuits in the bottom right make the output and input references. The output reference voltage is half the full scale of the Teensy A/Ds. The input reference voltage must make the positive and negative changes to the integral have the same magnitude. Both references need buffers (op-amps).
+
+The conditioning circuits (down the left side) accommodate the various types of measurements we'll make. The current transformer interface needs to draw zero current from the transformer so, it goes straight into an op-amp which is the least current draw you can get. The transformer actually outputs the derivative of the current (change in current) not the actual current so, when you integrate it you get the current and not integral of the current (like the rest of the options). These "change in current" signals are quite fleeting and noisy so you have to have analog integration to use current transformers.
